@@ -33,7 +33,7 @@ struct Options parse_option(int argc, char *argv[]){
             for(int i=1; i<arg.size(); i++){
                 if(arg[i] == 'f'){
                     opt.force = true;
-                } else if(arg[i] == 'r'){
+                } else if(arg[i] == 'R'){
                     opt.recursive = true;
                 } else{
                     opt.error = -1;

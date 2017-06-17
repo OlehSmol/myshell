@@ -8,6 +8,9 @@
 #include <algorithm>
 #include <fcntl.h>
 
+#define READ_END 0
+#define WRITE_END 1
+
 Interpreter::Interpreter(std::string execpath){
     _execpath = execpath;
 }
@@ -106,20 +109,23 @@ void Interpreter::substitution_vars(){
 }
 
 void Interpreter::chk_redirect_output(){
-    for (std::vector<std::string>::iterator it=_args.begin(); it!=_args.end();)
+    for (std::vector<std::string>::iterator it=_args.begin()+1; it!=_args.end();)
     {
         if(*it == ">"){
             _args.erase(it);
             if(it!=_args.end()){
                 _stdout = *it;
+                _args.erase(it);
             }
         } else if(*it == "2>"){
             _args.erase(it);
             if(it!=_args.end()){
                 _stderr = *it;
+                _args.erase(it);
             }
         } else if(*it == "2>&1" && _stdout != ""){
             _stderr = _stdout;
+            _args.erase(it);
         }
         else {
             ++it;
@@ -156,23 +162,26 @@ void Interpreter::process_args(std::string line) {
 
 
 
-int Interpreter::execute_line(std::string line){
+int Interpreter::execute_line(std::string line, bool ispipe, int in_fd){
     clean();
     process_args(line);
 
     if(_cmd == ""){
         return 0;
+    } else if(_cmd == "cd"){
+        my_cd(_args);
+        return 0;
     } else if(_cmd == "exit"){
         exit(0);
     }
-
-    int pid = fork();
-    int status;
     int fd[2];
 
     if(_pipe != ""){
         pipe(fd);
     }
+    int pid = fork();
+    int status;
+
     if(pid < 0){
         perror("Fork failed\n");
         return -1;
@@ -180,50 +189,56 @@ int Interpreter::execute_line(std::string line){
         if(_background){
             close_std();
         }
-        if(_pipe != ""){
-            dup2(STDIN_FILENO, STDOUT_FILENO);
+        if(_pipe == ""){
             close(fd[0]);
+            dup2(in_fd, STDIN_FILENO);
+        } else {
+            close(fd[0]);
+            dup2(in_fd, STDIN_FILENO);
+            dup2(fd[1], STDOUT_FILENO);
         }
         if(_stdin != ""){
-            int fd = open(_stdin.c_str(), O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
-            if(fd == -1){
+            int fd_r = open(_stdin.c_str(), O_RDONLY);
+            if(fd_r == -1){
                 perror("Can`t open file for writing\n");
                 exit(-1);
             }
-            dup2(STDIN_FILENO, fd);
+            dup2(STDIN_FILENO, fd_r);
         }
         if(_stdout != ""){
-            int fd = open(_stdin.c_str(), O_RDONLY);
-            if(fd == -1){
+            int fd_w = open(_stdout.c_str(), O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
+            if(fd_w == -1){
                 perror("Can`t open file for reading\n");
                 exit(-1);
             }
-            dup2(STDIN_FILENO, fd);
+            dup2(fd_w, STDOUT_FILENO);
         }
         if(_stderr != ""){
-            int fd = open(_stderr.c_str(), O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
-            if(fd == -1){
+            int fd_w = open(_stderr.c_str(), O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
+            if(fd_w == -1){
                 perror("Can`t open file for writing\n");
                 exit(-1);
             }
-            dup2(STDERR_FILENO, fd);
+            dup2(fd_w, STDERR_FILENO);
         }
 
         if(_cmd == "echo"){
             my_echo(_args);
         } else if(_cmd == "pwd"){
             my_pwd(_args);
-        } else if(_cmd == "cd"){
-            my_cd(_args);
         } else {
             run_external();
         }
         exit(0);
-    } else if(_pipe != ""){
-        execute_line(_pipe);
-        close(fd[1]);
     } else if(!_background){
+        if (_pipe != ""){
+            close(fd[1]);
+            close(in_fd);
+        }
         waitpid(pid, &status, WUNTRACED);
+        if(_pipe != ""){
+            execute_line(_pipe, true, fd[0]);
+        }
     } else {
         std::cout << "[] " << pid << std::endl;
     }

@@ -56,12 +56,8 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    for(int i=1; i<opt.files.size(); i++){
+    for(int i=0; i<opt.files.size(); i++){
         const char* path = opt.files[i].c_str();
-        if(path[0] == '-'){
-            std::cout << std::string("invalid option '") + path + "'\n";
-            continue;
-        }
         if (mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR) == -1){
             if(errno == EACCES){
                 std::cout<< std::string("mkdir: cannot create directory '") +

@@ -26,10 +26,10 @@ int main(int argc, char *argv[]) {
         }
 
         std::string line = "";
-        unsigned char buffer[100];
+        unsigned char buffer[1000];
         int sz;
 
-        while(sz = read(fd_r, buffer, 100)){
+        while(sz = read(fd_r, buffer, 1000)){
             for(int i=0; i<sz; i++) {
                 if(buffer[i] == '\n'){
                     if(line.empty()){

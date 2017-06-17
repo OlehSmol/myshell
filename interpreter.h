@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <unistd.h>
 
 class Interpreter {
     private:
@@ -30,7 +31,7 @@ class Interpreter {
         int run_external();
     public:
         Interpreter(std::string execpath);
-        int execute_line(std::string line);
+        int execute_line(std::string line, bool ispipe = false, int in_fd = STDIN_FILENO);
 };
 
 
